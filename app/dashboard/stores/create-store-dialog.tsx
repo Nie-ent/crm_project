@@ -26,7 +26,7 @@ const schema = z.object({
     type: z.enum(['a_la_carte', 'buffet']),
 })
 
-export function CreateStoreDialog({ variant = 'default' }: { variant?: 'default' | 'outline' | 'ghost' }) {
+export function CreateStoreDialog({ variant = 'default', tenantId }: { variant?: 'default' | 'outline' | 'ghost', tenantId?: string }) {
     const [open, setOpen] = useState(false)
     const [loading, setLoading] = useState(false)
 
@@ -43,6 +43,9 @@ export function CreateStoreDialog({ variant = 'default' }: { variant?: 'default'
         const formData = new FormData()
         formData.append('name', data.name)
         formData.append('type', data.type)
+        if (tenantId) {
+            formData.append('tenantId', tenantId)
+        }
 
         try {
             const res = await createStore(null, formData)

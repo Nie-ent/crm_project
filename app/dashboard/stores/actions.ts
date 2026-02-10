@@ -16,9 +16,18 @@ export async function createStore(prevState: any, formData: FormData) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { error: 'Unauthorized' }
 
-    // Get Tenant ID
-    const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', user.id).single()
-    if (!profile?.tenant_id) return { error: 'No organization found' }
+    // Get User Role & Tenant
+    const { data: profile } = await supabase.from('profiles').select('tenant_id, role').eq('id', user.id).single()
+
+    // Determine Tenant ID
+    let targetTenantId = profile?.tenant_id
+    const overrideTenantId = formData.get('tenantId') as string | null
+
+    if (profile?.role === 'super_admin' && overrideTenantId) {
+        targetTenantId = overrideTenantId
+    }
+
+    if (!targetTenantId) return { error: 'No organization found' }
 
     // Validate
     const data = Object.fromEntries(formData)
@@ -34,7 +43,7 @@ export async function createStore(prevState: any, formData: FormData) {
     const { error } = await supabase.from('stores').insert({
         name,
         type,
-        tenant_id: profile.tenant_id,
+        tenant_id: targetTenantId,
     })
 
     if (error) {

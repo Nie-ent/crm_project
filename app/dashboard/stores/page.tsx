@@ -12,15 +12,33 @@ import { Badge } from '@/components/ui/badge'
 import { Link } from 'lucide-react'
 import NextLink from 'next/link'
 
-export default async function StoresPage() {
+interface StoresPageProps {
+    searchParams: { [key: string]: string | string[] | undefined }
+}
+
+export default async function StoresPage({ searchParams }: StoresPageProps) {
     const supabase = await createClient()
 
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Get User's Tenant
-    const { data: profile } = await supabase.from('profiles').select('tenant_id').eq('id', user?.id).single()
+    // Get User Role & Tenant
+    const { data: profile } = await supabase
+        .from('profiles')
+        .select('tenant_id, role')
+        .eq('id', user?.id)
+        .single()
 
-    if (!profile?.tenant_id) {
+    // Determine which tenant to use
+    let targetTenantId = profile?.tenant_id
+    const params = await searchParams; // Next.js 15+ async searchParams
+    const overrideTenantId = typeof params.tenant_id === 'string' ? params.tenant_id : undefined
+
+    // If Super Admin and override is present, use it
+    if (profile?.role === 'super_admin' && overrideTenantId) {
+        targetTenantId = overrideTenantId
+    }
+
+    if (!targetTenantId && profile?.role !== 'super_admin') {
         return (
             <div className="p-8">
                 <h1 className="text-2xl font-bold">No Organization Found</h1>
@@ -28,22 +46,42 @@ export default async function StoresPage() {
         )
     }
 
-    const { data: stores } = await supabase
-        .from('stores')
-        .select('*')
-        .eq('tenant_id', profile.tenant_id)
+    // Initialize query
+    let query = supabase.from('stores').select('*')
+
+    // If super admin and no tenant specified, maybe show ALL (careful with volume) or just own?
+    // Let's filter by targetTenantId if exists. 
+    if (targetTenantId) {
+        query = query.eq('tenant_id', targetTenantId)
+    } else if (profile?.role === 'super_admin') {
+        // Show all stores if super admin and no specific tenant selected?
+        // Or prompt to select one? 
+        // For now, let's show all, but order by tenant
+        query = query.order('tenant_id', { ascending: true })
+    }
+
+    const { data: stores } = await query
 
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">My Stores</h1>
-                <CreateStoreDialog />
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight">
+                        {targetTenantId ? 'Stores' : 'All Stores (Admin)'}
+                    </h1>
+                    {profile?.role === 'super_admin' && targetTenantId && (
+                        <p className="text-muted-foreground text-sm">
+                            Viewing as Super Admin for Tenant ID: {targetTenantId}
+                        </p>
+                    )}
+                </div>
+                {targetTenantId && <CreateStoreDialog tenantId={targetTenantId} />}
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {stores?.length === 0 && (
                     <div className="col-span-3 text-center py-10 text-muted-foreground">
-                        No stores found. Create your first branch.
+                        No stores found.
                     </div>
                 )}
                 {stores?.map((store) => (

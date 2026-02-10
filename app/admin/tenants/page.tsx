@@ -79,7 +79,9 @@ export default async function TenantsPage() {
                                         <DropdownMenuContent align="end">
                                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                             <DropdownMenuItem>View Details</DropdownMenuItem>
-                                            <DropdownMenuItem>Manage Stores</DropdownMenuItem>
+                                            <DropdownMenuItem asChild>
+                                                <a href={`/dashboard/stores?tenant_id=${tenant.id}`}>Manage Stores</a>
+                                            </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem className="text-red-600">Suspend Tenant</DropdownMenuItem>
                                         </DropdownMenuContent>
